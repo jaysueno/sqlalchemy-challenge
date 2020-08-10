@@ -106,7 +106,7 @@ def tobs():
     # Create our session (link) from Python to the DB
     session = Session(engine) 
     # Query date and prcp from database and then turn into a dictionary
-    station_12months = session.query(Measurement.station, Measurement.tobs)\
+    station_12months = session.query(Measurement.date, Measurement.tobs)\
         .filter(Measurement.station == 'USC00519281')\
         .filter(Measurement.date >= '2016-08-23').all()
     # Close session to server to prevent hackers
@@ -124,19 +124,14 @@ def date_starts(start):
     # Create our session (link) from Python to the DB
     session = Session(engine) 
     # Query date and prcp from database and then turn into a dictionary
-    # Lowest temperature query
-    station_low_temp = session.query(func.min(Measurement.tobs))\
-        .filter(Measurement.station == 'USC00519281')\
-        .filter(Measurement.date >= start).first()
-    station_avg_temp = session.query(func.avg(Measurement.tobs))\
-        .filter(Measurement.station == 'USC00519281')\
-        .filter(Measurement.date >= start).first()
-    station_high_temp = session.query(func.max(Measurement.tobs))\
+    # Lowest, avgerage, and highest temperature query
+    station_results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
         .filter(Measurement.station == 'USC00519281')\
         .filter(Measurement.date >= start).first()
     # Close session to server to prevent hackers
     session.close()
-    temps_dict = {"Low Temp": station_low_temp, "Average Temp": station_avg_temp, "Hi Temp": station_high_temp}
+    # Create dictionary with the results
+    temps_dict = {"Low Temp": station_results[0], "Average Temp": station_results[1], "Hi Temp": station_results[2]}
     return jsonify(temps_dict)
 
 # 9. Create route "/api/v1.0/<start>/<end>"
@@ -148,21 +143,13 @@ def date_start_end(start, end):
     session = Session(engine) 
     # Query date and prcp from database and then turn into a dictionary
     # Lowest temperature query
-    station_low_temp = session.query(func.min(Measurement.tobs))\
-        .filter(Measurement.station == 'USC00519281')\
-        .filter(Measurement.date <= end)\
-        .filter(Measurement.date >= start).first()
-    station_avg_temp = session.query(func.avg(Measurement.tobs))\
-        .filter(Measurement.station == 'USC00519281')\
-        .filter(Measurement.date <= end)\
-        .filter(Measurement.date >= start).first()
-    station_high_temp = session.query(func.max(Measurement.tobs))\
+    station_results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
         .filter(Measurement.station == 'USC00519281')\
         .filter(Measurement.date <= end)\
         .filter(Measurement.date >= start).first()
     # Close session to server to prevent hackers
     session.close()
-    temps_dict = {"Low Temp": station_low_temp, "Average Temp": station_avg_temp, "Hi Temp": station_high_temp}
+    temps_dict = {"Low Temp": station_results[0], "Average Temp": station_results[1], "Hi Temp": station_results[2]}
     return jsonify(temps_dict)
 
 if __name__ == '__main__':
