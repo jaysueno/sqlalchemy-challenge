@@ -45,6 +45,7 @@ def home():
         f"<li>/api/v1.0/tobs</li>"
         f"<li>/api/v1.0/<start></li>"
         f"<li>/api/v1.0/<start>/<end></li>"
+        f"<li>/about</li>"
         f"</ul>"
     )
 
@@ -67,19 +68,24 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine) 
     # Query date and prcp from database and then turn into a dictionary
-    data_prcp = session.query(Measurement.date, Measurement.prcp).order_by(Measurement.date.desc())\
-    .filter(Measurement.date > '2016-08-23').all()
+    data_prcp = session.query(Measurement.date, Measurement.prcp)\
+        .order_by(Measurement.date.desc())\
+        .filter(Measurement.date > '2016-08-23').all()
     # Close session to server to prevent hackers
     session.close()
     # Use list comprehession to create a dictionary
     prcp_dict = {}
-
-    return(
-
-    )
+    for date, prcp in data_prcp:
+        if date not in prcp_dict:
+            prcp_dict[date] = []
+            prcp_dict[date].append(prcp)
+        else:
+            prcp_dict[date].append(prcp)
+    return jsonify(prcp_dict)
 
 # 6. Create route "/api/v1.0/stations"
 # Return a JSON list of stations from the dataset.
+@app.route("/api/v1.0/stations")
 def station():
     print("Servier received request for '/api/v1.0/stations'.")
     # Create our session (link) from Python to the DB
@@ -94,46 +100,70 @@ def station():
 # 7. Create route "<li>/api/v1.0/tobs</li>"
 # Query the dates and temperature observations of the most active station for the last year of data.
 # Return a JSON list of temperature observations (TOBS) for the previous year.
-def temperatures():
-    print("Servier received request for '/api/v1.0/tobs'.")
+@app.route("/api/v1.0/tobs")
+def tobs():
+    print("Server received request for '/api/v1.0/tobs'.")
     # Create our session (link) from Python to the DB
     session = Session(engine) 
     # Query date and prcp from database and then turn into a dictionary
     station_12months = session.query(Measurement.station, Measurement.tobs)\
-    .filter(Measurement.station == 'USC00519281')\
-    .filter(Measurement.date > '2016-08-23')
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date >= '2016-08-23').all()
     # Close session to server to prevent hackers
     session.close()
+    # Print the temp data from the most active station from the last year
+    station_list = list(np.ravel(station_12months))
+    # station_list = list(np.ravel(results))
+    return jsonify(station_list)
 
-    return jsonify(station_12months)
+# 8. Create route "/api/v1.0/<start>"
+# When given the start only, calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date.
+@app.route("/api/v1.0/<start>")
+def date_starts(start):
+    print("Server received request for '/api/v1.0/<start>'.")
+    # Create our session (link) from Python to the DB
+    session = Session(engine) 
+    # Query date and prcp from database and then turn into a dictionary
+    # Lowest temperature query
+    station_low_temp = session.query(func.min(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date >= start).first()
+    station_avg_temp = session.query(func.avg(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date >= start).first()
+    station_high_temp = session.query(func.max(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date >= start).first()
+    # Close session to server to prevent hackers
+    session.close()
+    temps_dict = {"Low Temp": station_low_temp, "Average Temp": station_avg_temp, "Hi Temp": station_high_temp}
+    return jsonify(temps_dict)
 
+# 9. Create route "/api/v1.0/<start>/<end>"
+# When given the start only, calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date.
+@app.route("/api/v1.0/<start>/<end>")
+def date_start_end(start, end):
+    print("Server received request for '/api/v1.0/<start>/<end>'.")
+     # Create our session (link) from Python to the DB
+    session = Session(engine) 
+    # Query date and prcp from database and then turn into a dictionary
+    # Lowest temperature query
+    station_low_temp = session.query(func.min(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date <= end)\
+        .filter(Measurement.date >= start).first()
+    station_avg_temp = session.query(func.avg(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date <= end)\
+        .filter(Measurement.date >= start).first()
+    station_high_temp = session.query(func.max(Measurement.tobs))\
+        .filter(Measurement.station == 'USC00519281')\
+        .filter(Measurement.date <= end)\
+        .filter(Measurement.date >= start).first()
+    # Close session to server to prevent hackers
+    session.close()
+    temps_dict = {"Low Temp": station_low_temp, "Average Temp": station_avg_temp, "Hi Temp": station_high_temp}
+    return jsonify(temps_dict)
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-#Jsonify example 
-#hello_dict = {"Hello": "World!"}
-
-# @app.route("/normal")
-# def normal():
-#     return hello_dict
-
-
-# @app.route("/jsonified")
-# def jsonified():
-#     return jsonify(hello_dict)
-
-## example of doing a search through the url name and returning a json dict
-# @app.route("/api/v1.0/justice-league/<real_name>")
-# def justice_league_character(real_name):
-#     """Fetch the Justice League character whose real_name matches
-#        the path variable supplied by the user, or a 404 if not."""
-
-#     canonicalized = real_name.replace(" ", "").lower()
-#     for character in justice_league_members:
-#         search_term = character["real_name"].replace(" ", "").lower()
-
-#         if search_term == canonicalized:
-#             return jsonify(character)
-
-#     return jsonify({"error": f"Character with real_name {real_name} not found."}), 404
